@@ -1,0 +1,68 @@
+type User @table {
+  deviceId: String!
+  publicKey: String!
+  displayName: String
+  fcmToken: String
+  createdAt: Timestamp
+}
+
+type Room @table {
+  roomId: String!
+  adminDeviceId: String!
+  name: String
+  createdAt: Timestamp
+}
+
+type Member @table {
+  deviceId: String!
+  roomId: String!
+  role: String!
+  certificate: String!
+  joinedAt: Timestamp
+}
+
+type File @table {
+  fileId: String!
+  uploadedBy: String!
+  fileName: String!
+  sizeBytes: Int64!
+  synced: Boolean!
+  roomId: String
+  recipientDeviceId: String
+  storageRef: String
+  encryptedKeyBlob: String
+  expiryTimestamp: Timestamp
+  maxViews: Int
+  viewCount: Int
+  deleted: Boolean
+  passcodeProtected: Boolean
+  saltHex: String
+  createdAt: Timestamp
+}
+
+type WebLink @table {
+  linkId: String!
+  fileId: String!
+  expiresAt: Timestamp
+  maxClicks: Int
+  clickCount: Int
+  revoked: Boolean
+  createdAt: Timestamp
+}
+
+type AuditLogEntry @table {
+  entryId: String!
+  roomId: String!
+  action: String!
+  actorDeviceId: String!
+  timestamp: Timestamp!
+  synced: Boolean!
+}
+
+type PendingRevoke @table {
+  fileId: String!
+  targetDeviceId: String!
+  revokedBy: String!
+  revokedAt: Timestamp!
+  delivered: Boolean!
+}

@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "725910729145",
+    "firebase_url": "https://sharenova-afe5f-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "sharenova-afe5f",
+    "storage_bucket": "sharenova-afe5f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:725910729145:android:ca9330ee43004a8d23c668",
+        "android_client_info": {
+          "package_name": "com.sharenova.sharenova_flutter"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "725910729145-3m8nmvlvvc5kl2s90jqm76p690og8f2h.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJsQGn2XeCdepaI9sFiO1nCkiEBIvyvGQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "725910729145-3m8nmvlvvc5kl2s90jqm76p690og8f2h.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
