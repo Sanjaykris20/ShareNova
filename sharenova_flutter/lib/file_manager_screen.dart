@@ -1,12 +1,23 @@
 // ignore_for_file: unused_import
 // ignore_for_file: avoid_print
 // ignore_for_file: use_build_context_synchronously
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:device_apps/device_apps.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:photo_manager/photo_manager.dart';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 import 'share_state.dart';
 import 'mock_data.dart';
+import '../services/app_service.dart';
+import '../services/contact_service.dart';
+import '../services/media_service.dart';
 
 class FileManagerScreen extends StatefulWidget {
   const FileManagerScreen({super.key});
@@ -19,11 +30,57 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
   late TabController _tabController;
   final List<String> _tabs = ['Apps', 'Contacts', 'Photos', 'Files', 'Videos'];
   bool _showSecurityOptions = false;
+  
+  bool _isLoading = true;
+  List<Application> _apps = [];
+  List<Contact> _contacts = [];
+  List<AssetEntity> _photos = [];
+  List<AssetEntity> _videos = [];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
+    _loadRealData();
+  }
+  
+  Future<void> _loadRealData() async {
+    if (kIsWeb) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    try {
+      final appService = AppService();
+      final contactService = ContactService();
+      final mediaService = MediaService();
+
+      final results = await Future.wait([
+        appService.getInstalledApps(),
+        contactService.getContacts(),
+        mediaService.getPhotos(),
+        mediaService.getVideos(),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _apps = results[0] as List<Application>;
+          _contacts = results[1] as List<Contact>;
+          _photos = results[2] as List<AssetEntity>;
+          _videos = results[3] as List<AssetEntity>;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading real data: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -73,16 +130,18 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
       ),
       body: Stack(
         children: [
-          TabBarView(
-            controller: _tabController,
-            children: [
-              _buildAppsTab(state),
-              _buildContactsTab(state),
-              _buildPhotosTab(state),
-              _buildFilesTab(state),
-              _buildVideosTab(state),
-            ],
-          ),
+          _isLoading
+              ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)))
+              : TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildAppsTab(state),
+                    _buildContactsTab(state),
+                    _buildPhotosTab(state),
+                    _buildFilesTab(state),
+                    _buildVideosTab(state),
+                  ],
+                ),
 
           // Selection Action Footer
           if (state.selectedContentIds.isNotEmpty)
@@ -162,6 +221,10 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
   }
 
   Widget _buildAppsTab(ShareState state) {
+    if (_apps.isEmpty) {
+      return const Center(child: Text("No apps found", style: TextStyle(color: Colors.grey)));
+    }
+    
     return GridView.builder(
       padding: const EdgeInsets.all(24),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -170,13 +233,14 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
         mainAxisSpacing: 24,
         childAspectRatio: 0.85,
       ),
-      itemCount: MockData.mockApps.length,
+      itemCount: _apps.length,
       itemBuilder: (context, index) {
-        final app = MockData.mockApps[index];
-        final isSelected = state.selectedContentIds.contains(app.id);
+        final app = _apps[index];
+        final id = "app_${app.packageName}";
+        final isSelected = state.selectedContentIds.contains(id);
 
         return GestureDetector(
-          onTap: () => state.toggleSelectContent(app.id),
+          onTap: () => state.toggleSelectContent(id, app),
           child: Column(
             children: [
               Stack(
@@ -187,11 +251,17 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: const Color(0xFFF3F4F6)),
-                      image: DecorationImage(
-                        image: NetworkImage(app.icon),
-                        fit: BoxFit.cover,
-                      ),
+                      image: app is ApplicationWithIcon
+                          ? DecorationImage(
+                              image: MemoryImage(app.icon),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
+                      color: app is! ApplicationWithIcon ? Colors.grey[200] : null,
                     ),
+                    child: app is! ApplicationWithIcon 
+                        ? const Icon(LucideIcons.app_window, color: Colors.grey) 
+                        : null,
                   ),
                   if (isSelected)
                     Container(
@@ -222,7 +292,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
               ),
               const SizedBox(height: 8),
               Text(
-                app.name,
+                app.appName,
                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -235,15 +305,24 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
   }
 
   Widget _buildContactsTab(ShareState state) {
+    if (_contacts.isEmpty) {
+      return const Center(child: Text("No contacts found", style: TextStyle(color: Colors.grey)));
+    }
+    
     return ListView.builder(
       padding: const EdgeInsets.all(24),
-      itemCount: MockData.mockContacts.length,
+      itemCount: _contacts.length,
       itemBuilder: (context, index) {
-        final contact = MockData.mockContacts[index];
-        final isSelected = state.selectedContentIds.contains(contact.id);
+        final contact = _contacts[index];
+        final id = "contact_${contact.id}";
+        final isSelected = state.selectedContentIds.contains(id);
+        
+        final name = contact.displayName;
+        final phone = contact.phones.isNotEmpty ? contact.phones.first.number : "No number";
+        final initial = name.isNotEmpty ? name[0].toUpperCase() : "?";
 
         return GestureDetector(
-          onTap: () => state.toggleSelectContent(contact.id),
+          onTap: () => state.toggleSelectContent(id, contact),
           child: Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(12),
@@ -258,15 +337,18 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
               children: [
                 CircleAvatar(
                   radius: 24,
-                  backgroundColor: Color(contact.bgColor),
-                  child: Text(
-                    contact.initials,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: Color(contact.textColor),
-                    ),
-                  ),
+                  backgroundColor: const Color(0xFFE5E7EB),
+                  backgroundImage: contact.photo != null ? MemoryImage(contact.photo!) : null,
+                  child: contact.photo == null
+                      ? Text(
+                          initial,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: Color(0xFF4B5563),
+                          ),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -274,7 +356,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        contact.name,
+                        name,
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
@@ -283,7 +365,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        contact.phone,
+                        phone,
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -317,28 +399,48 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
   }
 
   Widget _buildPhotosTab(ShareState state) {
-    return GridView.builder(
-      padding: const EdgeInsets.all(24),
+    if (_photos.isEmpty) {
+      return const Center(child: Text("No photos found", style: TextStyle(color: Colors.grey)));
+    }
+    
+    return Scrollbar(
+      interactive: true,
+      thickness: 8,
+      radius: const Radius.circular(10),
+      child: GridView.builder(
+        padding: const EdgeInsets.all(24),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
-      itemCount: 6,
+      itemCount: _photos.length,
       itemBuilder: (context, index) {
-        final id = "p$index";
+        final photo = _photos[index];
+        final id = "photo_${photo.id}";
         final isSelected = state.selectedContentIds.contains(id);
 
         return GestureDetector(
-          onTap: () => state.toggleSelectContent(id),
+          onTap: () => state.toggleSelectContent(id, photo),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Image.network(
-                  "https://images.unsplash.com/photo-${1500000000000 + index * 100000}?w=150&h=150&fit=crop",
-                  fit: BoxFit.cover,
+                FutureBuilder<Uint8List?>(
+                  future: photo.thumbnailData,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                    }
+                    if (snapshot.hasData && snapshot.data != null) {
+                      return Image.memory(
+                        snapshot.data!,
+                        fit: BoxFit.cover,
+                      );
+                    }
+                    return Container(color: Colors.grey[200]);
+                  },
                 ),
                 if (isSelected)
                   Container(
@@ -365,7 +467,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
           ),
         );
       },
-    );
+    ));
   }
 
   Future<void> _pickRealFiles(ShareState state) async {
@@ -374,7 +476,8 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
         allowMultiple: true,
       );
       if (result != null && result.files.isNotEmpty) {
-        state.addPickedFiles(result.files);
+        final files = result.files.where((f) => f.path != null).map((f) => File(f.path!)).toList();
+        state.addPickedFiles(files);
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -449,13 +552,17 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
           ),
           const SizedBox(height: 12),
           ...state.pickedFiles.map((file) {
-            final id = "picked_${file.name}";
+            final basename = file.uri.pathSegments.last;
+            final id = "picked_$basename";
             final isSelected = state.selectedContentIds.contains(id);
 
             // Format size
-            String sizeStr = "${(file.size / 1024).toStringAsFixed(1)} KB";
-            if (file.size > 1024 * 1024) {
-              sizeStr = "${(file.size / (1024 * 1024)).toStringAsFixed(1)} MB";
+            int sizeBytes = 0;
+            try { sizeBytes = file.lengthSync(); } catch (_) {}
+            
+            String sizeStr = "${(sizeBytes / 1024).toStringAsFixed(1)} KB";
+            if (sizeBytes > 1024 * 1024) {
+              sizeStr = "${(sizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB";
             }
 
             return GestureDetector(
@@ -480,7 +587,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            file.name,
+                            basename,
                             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF111827)),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -580,29 +687,49 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
   }
 
   Widget _buildVideosTab(ShareState state) {
-    return GridView.builder(
-      padding: const EdgeInsets.all(24),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+    if (_videos.isEmpty) {
+      return const Center(child: Text("No videos found", style: TextStyle(color: Colors.grey)));
+    }
+    
+    return Scrollbar(
+      interactive: true,
+      thickness: 8,
+      radius: const Radius.circular(10),
+      child: GridView.builder(
+        padding: const EdgeInsets.all(24),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
         childAspectRatio: 1.5,
       ),
-      itemCount: 4,
+      itemCount: _videos.length,
       itemBuilder: (context, index) {
-        final id = "v$index";
+        final video = _videos[index];
+        final id = "video_${video.id}";
         final isSelected = state.selectedContentIds.contains(id);
 
         return GestureDetector(
-          onTap: () => state.toggleSelectContent(id),
+          onTap: () => state.toggleSelectContent(id, video),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(20),
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Image.network(
-                  "https://images.unsplash.com/photo-${1511110000000 + index * 12345}?w=250&h=150&fit=crop",
-                  fit: BoxFit.cover,
+                FutureBuilder<Uint8List?>(
+                  future: video.thumbnailData,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                    }
+                    if (snapshot.hasData && snapshot.data != null) {
+                      return Image.memory(
+                        snapshot.data!,
+                        fit: BoxFit.cover,
+                      );
+                    }
+                    return Container(color: Colors.grey[200]);
+                  },
                 ),
                 Container(
                   color: Colors.black.withValues(alpha: 0.2),
@@ -635,7 +762,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
           ),
         );
       },
-    );
+    ));
   }
 
   Widget _buildSecurityDrawer(ShareState state) {

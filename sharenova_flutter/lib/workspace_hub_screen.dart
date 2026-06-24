@@ -104,6 +104,18 @@ class WorkspaceHubScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 32),
+            // Send Files button – starts P2P send flow
+            ElevatedButton.icon(
+              icon: const Icon(LucideIcons.upload),
+              label: const Text('Send Files'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              ),
+              onPressed: () => state.navigateTo('device_discovery'),
+            ),
+            const SizedBox(height: 32),
             const Text(
               "Your Active Spaces",
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF111827)),

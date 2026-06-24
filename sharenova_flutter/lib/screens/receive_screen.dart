@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../services/p2p_service.dart';
 import '../share_state.dart';
@@ -147,19 +148,44 @@ class _ReceiveScreenState extends State<ReceiveScreen> with SingleTickerProvider
                             style: const TextStyle(fontSize: 12, color: Colors.grey),
                           ),
                           const SizedBox(height: 24),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2563EB),
-                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _receivedFilePath = null;
-                                _progress = 0.0;
-                              });
-                            },
-                            child: const Text("Receive Another", style: TextStyle(fontWeight: FontWeight.bold)),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF2563EB),
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                ),
+                                onPressed: () {
+                                  // Accept – keep the file
+                                  setState(() {
+                                    _receivedFilePath = null;
+                                    _progress = 0.0;
+                                  });
+                                },
+                                child: const Text("Accept", style: TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                              const SizedBox(width: 16),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                ),
+                                onPressed: () {
+                                  // Reject – delete the file if it exists
+                                  if (_receivedFilePath != null) {
+                                    try { File(_receivedFilePath!).deleteSync(); } catch (_) {}
+                                  }
+                                  setState(() {
+                                    _receivedFilePath = null;
+                                    _progress = 0.0;
+                                  });
+                                },
+                                child: const Text("Reject", style: TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                            ],
                           )
                         ],
                       ),

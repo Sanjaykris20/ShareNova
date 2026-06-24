@@ -25,6 +25,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "13.0.0"
+  archive:
+    dependency: "direct main"
+    description:
+      name: archive
+      sha256: a96e8b390886ee8abb49b7bd3ac8df6f451c621619f52a26e815fdcf568959ff
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.0.9"
   args:
     dependency: transitive
     description:
@@ -201,6 +209,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.14"
+  device_apps:
+    dependency: "direct main"
+    description:
+      name: device_apps
+      sha256: e84dc74d55749993fd671148cc0bd53096e1be0c268fc364285511b1d8a4c19b
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.0"
   device_info_plus:
     dependency: transitive
     description:
@@ -438,6 +454,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.4.0"
+  flutter_contacts:
+    dependency: "direct main"
+    description:
+      name: flutter_contacts
+      sha256: "29ca942d521936976f52839f619c28ac5cc3b230d8ded7fcfb605c928da7738e"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.9"
   flutter_driver:
     dependency: transitive
     description: flutter
@@ -879,6 +903,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "7.0.2"
+  photo_manager:
+    dependency: "direct main"
+    description:
+      name: photo_manager
+      sha256: fb3bc8ea653370f88742b3baa304700107c83d12748aa58b2b9f2ed3ef15e6c2
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.9.0"
   platform:
     dependency: transitive
     description:
@@ -895,6 +927,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.8"
+  posix:
+    dependency: transitive
+    description:
+      name: posix
+      sha256: "185ef7606574f789b40f289c233efa52e96dead518aed988e040a10737febb07"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.5.0"
   process:
     dependency: transitive
     description:
@@ -1084,6 +1124,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.0"
+  uri_to_file:
+    dependency: "direct main"
+    description:
+      name: uri_to_file
+      sha256: cbbb38f975d22311efacc9a53cdcb806708606666d8092314b81c5cb7983b700
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.0"
   url_launcher_linux:
     dependency: transitive
     description:

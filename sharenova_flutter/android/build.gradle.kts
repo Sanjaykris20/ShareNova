@@ -29,6 +29,11 @@ subprojects {
         afterEvaluate {
             val android = extensions.findByName("android")
             if (android != null && android is com.android.build.gradle.BaseExtension) {
+                val currentCompileSdk = android.compileSdkVersion?.toString()?.replace("android-", "")?.toIntOrNull()
+                if (currentCompileSdk != null && currentCompileSdk < 34) {
+                    android.compileSdkVersion(34)
+                }
+                
                 if (android.namespace == null) {
                     val namespaceName = project.group.toString().let {
                         if (it.isEmpty()) "com.example.${project.name.replace("-", "_").replace(" ", "_")}" else it

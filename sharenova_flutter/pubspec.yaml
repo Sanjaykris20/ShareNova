@@ -52,6 +52,11 @@ dependencies:
   google_sign_in: ^7.2.0
   path: ^1.9.1
   sqflite: ^2.3.0
+  device_apps: ^2.2.0
+  photo_manager: ^3.9.0
+  uri_to_file: ^1.0.0
+  archive: ^4.0.9
+  flutter_contacts: 1.1.9
 
 dev_dependencies:
   firebase_storage_mocks: ^0.8.1

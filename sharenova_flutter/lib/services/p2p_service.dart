@@ -10,6 +10,7 @@ import 'package:cryptography/cryptography.dart';
 import 'package:path_provider/path_provider.dart';
 import '../core/crypto/ecdh_key_pair.dart';
 import '../core/crypto/aes_gcm_cipher.dart';
+import 'compression_service.dart';
 
 /// Represents a discovered peer device
 class P2pDevice {
@@ -152,6 +153,8 @@ class P2pService {
 
           final List<int> buffer = [];
           Uint8List? aesKey;
+          int? metadataSize;
+          Map<String, dynamic>? metadata;
           int? expectedSize;
           final List<int> encryptedPayload = [];
 
@@ -168,14 +171,29 @@ class P2pService {
                 aesKey = await serverKeyPair.deriveSharedSecret(clientPublicKey);
               }
 
-              // 2. Next 8 bytes is the big-endian file size
-              if (aesKey != null && expectedSize == null && buffer.length >= 8) {
+              // 2. Next 4 bytes is the metadata size
+              if (aesKey != null && metadataSize == null && buffer.length >= 4) {
+                final mSizeBytes = Uint8List.fromList(buffer.sublist(0, 4));
+                buffer.removeRange(0, 4);
+                metadataSize = ByteData.sublistView(mSizeBytes).getUint32(0, Endian.big);
+              }
+
+              // 3. Read metadata JSON
+              if (metadataSize != null && metadata == null && buffer.length >= metadataSize!) {
+                final jsonBytes = buffer.sublist(0, metadataSize!);
+                buffer.removeRange(0, metadataSize!);
+                final jsonString = utf8.decode(jsonBytes);
+                metadata = jsonDecode(jsonString);
+              }
+
+              // 4. Next 8 bytes is the big-endian file size
+              if (metadata != null && expectedSize == null && buffer.length >= 8) {
                 final sizeBytes = Uint8List.fromList(buffer.sublist(0, 8));
                 buffer.removeRange(0, 8);
                 expectedSize = ByteData.sublistView(sizeBytes).getUint64(0, Endian.big);
               }
 
-              // 3. The rest is the AES encrypted payload
+              // 5. The rest is the AES encrypted payload
               if (expectedSize != null) {
                 encryptedPayload.addAll(buffer);
                 buffer.clear();
@@ -192,9 +210,31 @@ class P2pService {
                       aesKey!,
                     );
                     
-                    final tempDir = await getTemporaryDirectory();
-                    final file = File('${tempDir.path}/shared_file_${DateTime.now().millisecondsSinceEpoch}.bin');
+                    final filename = metadata?['filename'] ?? 'shared_file_${DateTime.now().millisecondsSinceEpoch}.bin';
+                    
+                    // Attempt to save to Downloads
+                    Directory? saveDir;
+                    if (Platform.isAndroid) {
+                      saveDir = Directory('/storage/emulated/0/Download');
+                      if (!saveDir.existsSync()) {
+                        saveDir = await getExternalStorageDirectory();
+                      }
+                    } else {
+                      saveDir = await getApplicationDocumentsDirectory();
+                    }
+                    
+                    final file = File('${saveDir!.path}/$filename');
                     await file.writeAsBytes(decrypted);
+
+                    // If it's a zip file, unzip it and clean up the original zip
+                    if (filename.endsWith('.zip')) {
+                      final extractFolder = filename.replaceAll('.zip', '');
+                      final extractPath = '${saveDir.path}/$extractFolder';
+                      await CompressionService.unzipFile(file, extractPath);
+                      try {
+                        await file.delete();
+                      } catch (_) {}
+                    }
 
                     if (onTransferComplete != null) {
                       onTransferComplete!(file.path);
@@ -264,7 +304,24 @@ class P2pService {
 
   // ---------- File Transfer ----------
 
-  Future<void> sendFile(File file, P2pSession session) async {
+  Future<void> sendFiles(List<File> files, P2pSession session, {bool compress = false}) async {
+    int totalBytes = 0;
+    for (final file in files) {
+      try { totalBytes += file.lengthSync(); } catch (_) {}
+    }
+    
+    int sentBytes = 0;
+    for (final file in files) {
+      await sendFile(file, session, isBatch: true, batchSentBytes: sentBytes, batchTotalBytes: totalBytes);
+      try { sentBytes += file.lengthSync(); } catch (_) {}
+    }
+    
+    if (onTransferComplete != null) {
+      onTransferComplete!("All files sent successfully");
+    }
+  }
+
+  Future<void> sendFile(File file, P2pSession session, {bool isBatch = false, int batchSentBytes = 0, int batchTotalBytes = 0}) async {
     Socket? socket;
     try {
       socket = await Socket.connect(session.ip, session.port, timeout: const Duration(seconds: 10));
@@ -274,17 +331,27 @@ class P2pService {
       socket.add(clientKeyPair.publicKey.bytes);
       await socket.flush();
 
-      // 2. Read, encrypt file bytes
+      // 2. Prepare and send metadata
+      final filename = file.uri.pathSegments.last;
+      final metadata = jsonEncode({'filename': filename});
+      final metadataBytes = utf8.encode(metadata);
+      
+      final mSizeHeader = ByteData(4)..setUint32(0, metadataBytes.length, Endian.big);
+      socket.add(mSizeHeader.buffer.asUint8List());
+      socket.add(metadataBytes);
+      await socket.flush();
+
+      // 3. Read, encrypt file bytes
       final fileBytes = await file.readAsBytes();
       final encrypted = await AesGcmCipher.encrypt(Uint8List.fromList(fileBytes), session.aesKey);
       final length = encrypted.length;
 
-      // 3. Send file size header (8 bytes)
+      // 4. Send file size header (8 bytes)
       final sizeHeader = ByteData(8)..setUint64(0, length, Endian.big);
       socket.add(sizeHeader.buffer.asUint8List());
       await socket.flush();
 
-      // 4. Send encrypted payload in chunks
+      // 5. Send encrypted payload in chunks
       int sent = 0;
       const chunkSize = 64 * 1024; // 64KB
       for (int offset = 0; offset < length; offset += chunkSize) {
@@ -293,13 +360,17 @@ class P2pService {
         socket.add(chunk);
         sent += chunk.length;
         if (onProgress != null) {
-          onProgress!(sent / length);
+          if (isBatch && batchTotalBytes > 0) {
+            onProgress!((batchSentBytes + sent) / batchTotalBytes);
+          } else {
+            onProgress!(sent / length);
+          }
         }
         await socket.flush();
       }
 
       socket.destroy();
-      if (onTransferComplete != null) {
+      if (!isBatch && onTransferComplete != null) {
         onTransferComplete!("Sent successfully");
       }
     } catch (e) {

@@ -18,6 +18,7 @@ import 'screens/device_discovery_screen.dart';
 import 'transfer_screen.dart';
 import 'room_gateway_screen.dart';
 import 'room_host_screen.dart';
+import 'room_scanner_screen.dart';
 import 'history_screen.dart';
 import 'analytics_screen.dart';
 import 'auto_sync_screen.dart';
@@ -83,6 +84,8 @@ class RootNavigator extends StatelessWidget {
         return RoomHostScreen();
       case 'chat_room':
         return ChatRoomScreen();
+      case 'room_scanner':
+        return const RoomScannerScreen();
       case 'history':
         return HistoryScreen();
       case 'analytics':

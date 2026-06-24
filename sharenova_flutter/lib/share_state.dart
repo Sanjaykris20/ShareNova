@@ -4,7 +4,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:device_apps/device_apps.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:photo_manager/photo_manager.dart';
+import 'package:path_provider/path_provider.dart';
+
 import 'services/p2p_service.dart';
+import 'models/nearby_user.dart';
 import 'mock_data.dart';
 import 'room_service.dart';
 
@@ -25,15 +31,25 @@ class ShareState extends ChangeNotifier {
   int _currentTab = 0;
   int get currentTab => _currentTab;
 
+  String _previousRoute = 'home';
+  String get previousRoute => _previousRoute;
+
   void navigateTo(String route) {
     if (route == 'profile') {
       setTab(4);
     } else if (route == 'room_gateway') {
       setTab(3);
     } else {
+      if (route != _currentRoute) {
+        _previousRoute = _currentRoute;
+      }
       _currentRoute = route;
       notifyListeners();
     }
+  }
+
+  void goBack() {
+    navigateTo(_previousRoute);
   }
 
   void setTab(int index) {
@@ -45,44 +61,82 @@ class ShareState extends ChangeNotifier {
   // File Selector State
   final List<dynamic> _selectedContentIds = [];
   List<dynamic> get selectedContentIds => _selectedContentIds;
+  
+  final Map<String, dynamic> _selectedObjects = {};
 
-  final List<PlatformFile> _pickedFiles = [];
-  List<PlatformFile> get pickedFiles => _pickedFiles;
+  final List<File> _pickedFiles = [];
+  List<File> get pickedFiles => List.unmodifiable(_pickedFiles);
 
-  void addPickedFiles(List<PlatformFile> files) {
+  void addPickedFiles(List<File> files) {
     for (var file in files) {
-      if (!_pickedFiles.any((f) => f.name == file.name)) {
+      if (!_pickedFiles.any((f) => f.path == file.path)) {
         _pickedFiles.add(file);
-        _selectedContentIds.add("picked_${file.name}");
+        _selectedContentIds.add("file_${file.path}");
       }
     }
     notifyListeners();
   }
 
-  void removePickedFile(PlatformFile file) {
-    _pickedFiles.removeWhere((f) => f.name == file.name);
-    _selectedContentIds.remove("picked_${file.name}");
+  void removePickedFile(File file) {
+    _pickedFiles.removeWhere((f) => f.path == file.path);
+    _selectedContentIds.remove("file_${file.path}");
     notifyListeners();
   }
 
-  void toggleSelectContent(dynamic id) {
+  void toggleSelectContent(dynamic id, [dynamic object]) {
     if (_selectedContentIds.contains(id)) {
       _selectedContentIds.remove(id);
-      // Also clean up pickedFiles if it's a picked file
-      if (id.toString().startsWith("picked_")) {
-        final filename = id.toString().replaceFirst("picked_", "");
-        _pickedFiles.removeWhere((f) => f.name == filename);
+      _selectedObjects.remove(id);
+      // Also clean up pickedFiles if it's a generic file
+      if (id.toString().startsWith("file_")) {
+        final filePath = id.toString().replaceFirst("file_", "");
+        _pickedFiles.removeWhere((f) => f.path == filePath);
       }
     } else {
       _selectedContentIds.add(id);
+      if (object != null) {
+        _selectedObjects[id.toString()] = object;
+      }
     }
     notifyListeners();
   }
 
   void clearSelection() {
     _selectedContentIds.clear();
+    _selectedObjects.clear();
     _pickedFiles.clear();
     notifyListeners();
+  }
+
+  Future<List<File>> resolveSelectedFiles() async {
+    List<File> filesToTransfer = List.from(_pickedFiles);
+    
+    final tempDir = await getTemporaryDirectory();
+
+    for (String id in _selectedContentIds) {
+      if (!_selectedObjects.containsKey(id)) continue;
+      
+      final obj = _selectedObjects[id];
+      
+      try {
+        if (obj is Application) {
+          final file = File(obj.apkFilePath);
+          if (file.existsSync()) filesToTransfer.add(file);
+        } else if (obj is Contact) {
+          final vCard = obj.toVCard();
+          final file = File('${tempDir.path}/${obj.displayName.replaceAll(" ", "_")}.vcf');
+          await file.writeAsString(vCard);
+          filesToTransfer.add(file);
+        } else if (obj is AssetEntity) {
+          final file = await obj.file;
+          if (file != null) filesToTransfer.add(file);
+        }
+      } catch (e) {
+        print('Error resolving file for $id: $e');
+      }
+    }
+    
+    return filesToTransfer;
   }
 
   // Security configuration rules
