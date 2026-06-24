@@ -27,7 +27,7 @@ class _AutoSyncScreenState extends State<AutoSyncScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(LucideIcons.arrow_left, color: Color(0xFF111827)),
-          onPressed: () => state.navigateTo('home'),
+          onPressed: () => state.goBack(),
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

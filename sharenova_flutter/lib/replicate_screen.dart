@@ -20,7 +20,7 @@ class ReplicateScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(LucideIcons.arrow_left, color: Color(0xFF111827)),
-          onPressed: () => state.navigateTo('profile'),
+          onPressed: () => state.goBack(),
         ),
         title: const Text(
           "Phone Replicate",

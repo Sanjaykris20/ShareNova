@@ -54,7 +54,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with TickerProviderSt
         elevation: 0,
         leading: IconButton(
           icon: const Icon(LucideIcons.arrow_left, color: Color(0xFF111827)),
-          onPressed: () => state.navigateTo('profile'),
+          onPressed: () => state.goBack(),
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
