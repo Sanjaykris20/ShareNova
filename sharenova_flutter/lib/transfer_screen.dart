@@ -39,8 +39,10 @@ class _TransferScreenState extends State<TransferScreen> {
     final p2p = Provider.of<P2pService>(context, listen: false);
     
     if (state.currentSession != null) {
-      state.setTransferPhase(3);
-      state.setTransferProgress(0.0);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        state.setTransferPhase(3);
+        state.setTransferProgress(0.0);
+      });
       
       p2p.onProgress = (progress) {
         if (mounted) state.setTransferProgress(progress * 100);
