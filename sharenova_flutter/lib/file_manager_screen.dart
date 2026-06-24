@@ -12,6 +12,7 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:intl/intl.dart';
 
 import 'share_state.dart';
 import 'mock_data.dart';
@@ -87,6 +88,18 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  String _formatDateGroup(DateTime? date) {
+    if (date == null) return "Unknown Date";
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final targetDate = DateTime(date.year, date.month, date.day);
+
+    if (targetDate == today) return "Today";
+    if (targetDate == yesterday) return "Yesterday";
+    return DateFormat('MMMM dd, yyyy').format(date);
   }
 
   @override
@@ -225,82 +238,117 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
       return const Center(child: Text("No apps found", style: TextStyle(color: Colors.grey)));
     }
     
-    return GridView.builder(
-      padding: const EdgeInsets.all(24),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 24,
-        childAspectRatio: 0.85,
-      ),
-      itemCount: _apps.length,
-      itemBuilder: (context, index) {
-        final app = _apps[index];
-        final id = "app_${app.packageName}";
-        final isSelected = state.selectedContentIds.contains(id);
+    // Group apps by date
+    final Map<String, List<Application>> groupedApps = {};
+    for (var app in _apps) {
+      final date = DateTime.fromMillisecondsSinceEpoch(app.installTimeMillis);
+      final group = _formatDateGroup(date);
+      if (!groupedApps.containsKey(group)) {
+        groupedApps[group] = [];
+      }
+      groupedApps[group]!.add(app);
+    }
 
-        return GestureDetector(
-          onTap: () => state.toggleSelectContent(id, app),
-          child: Column(
-            children: [
-              Stack(
-                children: [
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFF3F4F6)),
-                      image: app is ApplicationWithIcon
-                          ? DecorationImage(
-                              image: MemoryImage(app.icon),
-                              fit: BoxFit.cover,
-                            )
-                          : null,
-                      color: app is! ApplicationWithIcon ? Colors.grey[200] : null,
-                    ),
-                    child: app is! ApplicationWithIcon 
-                        ? const Icon(LucideIcons.app_window, color: Colors.grey) 
-                        : null,
-                  ),
-                  if (isSelected)
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                  Positioned(
-                    bottom: 6,
-                    right: 6,
-                    child: Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: isSelected ? const Color(0xFF2563EB) : Colors.black.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: isSelected
-                          ? const Icon(LucideIcons.check, size: 12, color: Colors.white)
-                          : null,
-                    ),
-                  ),
-                ],
+    final groups = groupedApps.entries.toList();
+
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: CustomScrollView(
+        slivers: groups.expand((entry) {
+          final dateHeader = entry.key;
+          final appsInGroup = entry.value;
+          return [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 16, top: 8),
+                child: Text(
+                  dateHeader,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF4B5563), letterSpacing: 1),
+                ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                app.appName,
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            ),
+            SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 24,
+                childAspectRatio: 0.7,
               ),
-            ],
-          ),
-        );
-      },
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final app = appsInGroup[index];
+                  final id = "app_${app.packageName}";
+                  final isSelected = state.selectedContentIds.contains(id);
+
+                  return GestureDetector(
+                    onTap: () => state.toggleSelectContent(id, app),
+                    child: Column(
+                      children: [
+                        Stack(
+                          children: [
+                            Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: const Color(0xFFF3F4F6)),
+                                image: app is ApplicationWithIcon
+                                    ? DecorationImage(
+                                        image: MemoryImage(app.icon),
+                                        fit: BoxFit.cover,
+                                      )
+                                    : null,
+                                color: app is! ApplicationWithIcon ? Colors.grey[200] : null,
+                              ),
+                              child: app is! ApplicationWithIcon 
+                                  ? const Icon(LucideIcons.app_window, color: Colors.grey) 
+                                  : null,
+                            ),
+                            if (isSelected)
+                              Container(
+                                width: 72,
+                                height: 72,
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                              ),
+                            Positioned(
+                              bottom: 6,
+                              right: 6,
+                              child: Container(
+                                width: 20,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  color: isSelected ? const Color(0xFF2563EB) : Colors.black.withValues(alpha: 0.2),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2),
+                                ),
+                                child: isSelected
+                                    ? const Icon(LucideIcons.check, size: 12, color: Colors.white)
+                                    : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          app.appName,
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                childCount: appsInGroup.length,
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          ];
+        }).toList(),
+      ),
     );
   }
 
@@ -403,71 +451,107 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
       return const Center(child: Text("No photos found", style: TextStyle(color: Colors.grey)));
     }
     
+    // Group photos by date
+    final Map<String, List<AssetEntity>> groupedPhotos = {};
+    for (var photo in _photos) {
+      final date = photo.createDateTime;
+      final group = _formatDateGroup(date);
+      if (!groupedPhotos.containsKey(group)) {
+        groupedPhotos[group] = [];
+      }
+      groupedPhotos[group]!.add(photo);
+    }
+
+    final groups = groupedPhotos.entries.toList();
+
     return Scrollbar(
       interactive: true,
       thickness: 8,
       radius: const Radius.circular(10),
-      child: GridView.builder(
+      child: Padding(
         padding: const EdgeInsets.all(24),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
-      itemCount: _photos.length,
-      itemBuilder: (context, index) {
-        final photo = _photos[index];
-        final id = "photo_${photo.id}";
-        final isSelected = state.selectedContentIds.contains(id);
+        child: CustomScrollView(
+          slivers: groups.expand((entry) {
+            final dateHeader = entry.key;
+            final photosInGroup = entry.value;
+            return [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 16, top: 8),
+                  child: Text(
+                    dateHeader,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF4B5563), letterSpacing: 1),
+                  ),
+                ),
+              ),
+              SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final photo = photosInGroup[index];
+                    final id = "photo_${photo.id}";
+                    final isSelected = state.selectedContentIds.contains(id);
 
-        return GestureDetector(
-          onTap: () => state.toggleSelectContent(id, photo),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                FutureBuilder<Uint8List?>(
-                  future: photo.thumbnailData,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-                    }
-                    if (snapshot.hasData && snapshot.data != null) {
-                      return Image.memory(
-                        snapshot.data!,
-                        fit: BoxFit.cover,
-                      );
-                    }
-                    return Container(color: Colors.grey[200]);
+                    return GestureDetector(
+                      onTap: () => state.toggleSelectContent(id, photo),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            FutureBuilder<Uint8List?>(
+                              future: photo.thumbnailData,
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState == ConnectionState.waiting) {
+                                  return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                                }
+                                if (snapshot.hasData && snapshot.data != null) {
+                                  return Image.memory(
+                                    snapshot.data!,
+                                    fit: BoxFit.cover,
+                                  );
+                                }
+                                return Container(color: Colors.grey[200]);
+                              },
+                            ),
+                            if (isSelected)
+                              Container(
+                                color: Colors.black.withValues(alpha: 0.2),
+                              ),
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Container(
+                                width: 20,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  color: isSelected ? const Color(0xFF2563EB) : Colors.black.withValues(alpha: 0.2),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2),
+                                ),
+                                child: isSelected
+                                    ? const Icon(LucideIcons.check, size: 12, color: Colors.white)
+                                    : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
                   },
+                  childCount: photosInGroup.length,
                 ),
-                if (isSelected)
-                  Container(
-                    color: Colors.black.withValues(alpha: 0.2),
-                  ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFF2563EB) : Colors.black.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: isSelected
-                        ? const Icon(LucideIcons.check, size: 12, color: Colors.white)
-                        : null,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    ));
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            ];
+          }).toList(),
+        ),
+      ),
+    );
   }
 
   Future<void> _pickRealFiles(ShareState state) async {
@@ -691,78 +775,114 @@ class _FileManagerScreenState extends State<FileManagerScreen> with SingleTicker
       return const Center(child: Text("No videos found", style: TextStyle(color: Colors.grey)));
     }
     
+    // Group videos by date
+    final Map<String, List<AssetEntity>> groupedVideos = {};
+    for (var video in _videos) {
+      final date = video.createDateTime;
+      final group = _formatDateGroup(date);
+      if (!groupedVideos.containsKey(group)) {
+        groupedVideos[group] = [];
+      }
+      groupedVideos[group]!.add(video);
+    }
+
+    final groups = groupedVideos.entries.toList();
+
     return Scrollbar(
       interactive: true,
       thickness: 8,
       radius: const Radius.circular(10),
-      child: GridView.builder(
+      child: Padding(
         padding: const EdgeInsets.all(24),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 1.5,
-      ),
-      itemCount: _videos.length,
-      itemBuilder: (context, index) {
-        final video = _videos[index];
-        final id = "video_${video.id}";
-        final isSelected = state.selectedContentIds.contains(id);
+        child: CustomScrollView(
+          slivers: groups.expand((entry) {
+            final dateHeader = entry.key;
+            final videosInGroup = entry.value;
+            return [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 16, top: 8),
+                  child: Text(
+                    dateHeader,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF4B5563), letterSpacing: 1),
+                  ),
+                ),
+              ),
+              SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 1.5,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final video = videosInGroup[index];
+                    final id = "video_${video.id}";
+                    final isSelected = state.selectedContentIds.contains(id);
 
-        return GestureDetector(
-          onTap: () => state.toggleSelectContent(id, video),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                FutureBuilder<Uint8List?>(
-                  future: video.thumbnailData,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-                    }
-                    if (snapshot.hasData && snapshot.data != null) {
-                      return Image.memory(
-                        snapshot.data!,
-                        fit: BoxFit.cover,
-                      );
-                    }
-                    return Container(color: Colors.grey[200]);
+                    return GestureDetector(
+                      onTap: () => state.toggleSelectContent(id, video),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            FutureBuilder<Uint8List?>(
+                              future: video.thumbnailData,
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState == ConnectionState.waiting) {
+                                  return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                                }
+                                if (snapshot.hasData && snapshot.data != null) {
+                                  return Image.memory(
+                                    snapshot.data!,
+                                    fit: BoxFit.cover,
+                                  );
+                                }
+                                return Container(color: Colors.grey[200]);
+                              },
+                            ),
+                            Container(
+                              color: Colors.black.withValues(alpha: 0.2),
+                              child: const Center(
+                                child: Icon(LucideIcons.video, color: Colors.white, size: 24),
+                              ),
+                            ),
+                            if (isSelected)
+                              Container(
+                                color: Colors.black.withValues(alpha: 0.2),
+                              ),
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Container(
+                                width: 20,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  color: isSelected ? const Color(0xFF2563EB) : Colors.black.withValues(alpha: 0.2),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2),
+                                ),
+                                child: isSelected
+                                    ? const Icon(LucideIcons.check, size: 12, color: Colors.white)
+                                    : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
                   },
+                  childCount: videosInGroup.length,
                 ),
-                Container(
-                  color: Colors.black.withValues(alpha: 0.2),
-                  child: const Center(
-                    child: Icon(LucideIcons.video, color: Colors.white, size: 24),
-                  ),
-                ),
-                if (isSelected)
-                  Container(
-                    color: Colors.black.withValues(alpha: 0.2),
-                  ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFF2563EB) : Colors.black.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: isSelected
-                        ? const Icon(LucideIcons.check, size: 12, color: Colors.white)
-                        : null,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    ));
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            ];
+          }).toList(),
+        ),
+      ),
+    );
   }
 
   Widget _buildSecurityDrawer(ShareState state) {

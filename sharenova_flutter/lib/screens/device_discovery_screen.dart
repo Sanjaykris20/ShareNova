@@ -1,6 +1,7 @@
 // ignore_for_file: unused_import
 // ignore_for_file: avoid_print
 // ignore_for_file: use_build_context_synchronously
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -21,6 +22,7 @@ class _DeviceDiscoveryScreenState extends State<DeviceDiscoveryScreen> with Tick
   late P2pService _p2pService;
   final List<P2pDevice> _devices = [];
   late List<AnimationController> _radarControllers;
+  StreamSubscription<P2pDevice>? _discoverySubscription;
 
   @override
   void initState() {
@@ -44,9 +46,10 @@ class _DeviceDiscoveryScreenState extends State<DeviceDiscoveryScreen> with Tick
 
   Future<void> _initializeDiscovery() async {
     await LocationPermissionService.requestLocationPermission();
-    _p2pService.startWifiDiscovery();
+    _p2pService.startDiscovery();
     _p2pService.startBleDiscovery();
-    _p2pService.discovered.listen((device) {
+    _discoverySubscription = _p2pService.discovered.listen((device) {
+      if (!mounted) return;
       setState(() {
         if (!_devices.any((d) => d.id == device.id && d.connectionType == device.connectionType)) {
           _devices.add(device);
@@ -57,7 +60,8 @@ class _DeviceDiscoveryScreenState extends State<DeviceDiscoveryScreen> with Tick
 
   @override
   void dispose() {
-    _p2pService.dispose();
+    _discoverySubscription?.cancel();
+    _p2pService.stopDiscovery();
     for (var controller in _radarControllers) {
       controller.dispose();
     }
@@ -75,7 +79,7 @@ class _DeviceDiscoveryScreenState extends State<DeviceDiscoveryScreen> with Tick
   Widget build(BuildContext context) {
     final state = Provider.of<ShareState>(context);
     return Scaffold(
-      backgroundColor: const Color(0xFF030712), // gray-950
+      backgroundColor: const Color(0xFFF9FAFB), // light background
       body: SafeArea(
         child: Stack(
           children: [
@@ -95,14 +99,14 @@ class _DeviceDiscoveryScreenState extends State<DeviceDiscoveryScreen> with Tick
                         shape: BoxShape.circle,
                         color: Colors.transparent,
                       ),
-                      child: const Icon(LucideIcons.arrow_left, color: Colors.white, size: 24),
+                      child: const Icon(LucideIcons.arrow_left, color: Color(0xFF1F2937), size: 24),
                     ),
                   ),
                   Column(
                     children: [
                       const Text(
                         "Nearby Radar",
-                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+                        style: TextStyle(color: Color(0xFF1F2937), fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.5),
                       ),
                       Row(
                         children: const [
@@ -162,12 +166,12 @@ class _DeviceDiscoveryScreenState extends State<DeviceDiscoveryScreen> with Tick
                       width: 96,
                       height: 96,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF111827),
+                        color: Colors.white,
                         shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF1F2937), width: 4),
+                        border: Border.all(color: const Color(0xFFE5E7EB), width: 4),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF2563EB).withValues(alpha: 0.3),
+                            color: const Color(0xFF2563EB).withValues(alpha: 0.15),
                             blurRadius: 40,
                             spreadRadius: 0,
                           ),
@@ -192,7 +196,7 @@ class _DeviceDiscoveryScreenState extends State<DeviceDiscoveryScreen> with Tick
                               decoration: BoxDecoration(
                                 color: const Color(0xFF2563EB),
                                 shape: BoxShape.circle,
-                                border: Border.all(color: const Color(0xFF030712), width: 2),
+                                border: Border.all(color: Colors.white, width: 2),
                               ),
                               child: const Center(
                                 child: Icon(LucideIcons.radar, color: Colors.white, size: 16),
@@ -239,7 +243,7 @@ class _DeviceDiscoveryScreenState extends State<DeviceDiscoveryScreen> with Tick
                                     Icon(
                                       device.connectionType == ConnectionType.wifiDirect ? LucideIcons.smartphone : LucideIcons.bluetooth,
                                       size: 30,
-                                      color: const Color(0xFF111827),
+                                      color: const Color(0xFF2563EB),
                                     ),
                                     Positioned(
                                       top: 4,
@@ -261,13 +265,20 @@ class _DeviceDiscoveryScreenState extends State<DeviceDiscoveryScreen> with Tick
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF1F2937).withValues(alpha: 0.8),
+                                  color: Colors.white,
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: const Color(0xFF374151)),
+                                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.05),
+                                      blurRadius: 5,
+                                      offset: const Offset(0, 2),
+                                    )
+                                  ]
                                 ),
                                 child: Text(
                                   device.displayName.isNotEmpty ? device.displayName : device.id,
-                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                  style: const TextStyle(color: Color(0xFF1F2937), fontSize: 11, fontWeight: FontWeight.bold),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -292,25 +303,22 @@ class _DeviceDiscoveryScreenState extends State<DeviceDiscoveryScreen> with Tick
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E3A8A).withValues(alpha: 0.3), // blue-900/30
+                      color: const Color(0xFFDBEAFE), // light blue
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFF1E40AF)), // blue-800
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF60A5FA),
-                            shape: BoxShape.circle,
-                          ),
+                      children: const [
+                        SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2563EB)),
                         ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          "Scanning for active P2P nodes...",
-                          style: TextStyle(color: Color(0xFF93C5FD), fontSize: 12, fontWeight: FontWeight.bold),
+                        SizedBox(width: 8),
+                        Text(
+                          "Scanning for peers...",
+                          style: TextStyle(color: Color(0xFF1E3A8A), fontSize: 12, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),

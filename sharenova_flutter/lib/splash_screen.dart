@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'share_state.dart';
+import 'services/auth_service.dart';
 
 // Splash Screen
 class SplashScreen extends StatefulWidget {
@@ -30,9 +31,21 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     );
     _controller.forward();
 
-    Future.delayed(const Duration(milliseconds: 2000), () {
+    Future.delayed(const Duration(milliseconds: 2000), () async {
       if (mounted) {
-        Provider.of<ShareState>(context, listen: false).navigateTo('home');
+        final authService = Provider.of<AuthService>(context, listen: false);
+        final state = Provider.of<ShareState>(context, listen: false);
+        
+        if (authService.currentUser != null) {
+          final profile = await authService.getUserProfile(authService.currentUser!.uid);
+          if (profile != null && mounted) {
+            state.navigateTo('home');
+          } else if (mounted) {
+            state.navigateTo('setup_profile');
+          }
+        } else if (mounted) {
+          state.navigateTo('login');
+        }
       }
     });
   }

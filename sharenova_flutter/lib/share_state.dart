@@ -28,13 +28,16 @@ class ShareState extends ChangeNotifier {
   String _currentRoute = 'splash';
   String get currentRoute => _currentRoute;
 
+  Map<String, dynamic>? _routeArguments;
+  Map<String, dynamic>? get routeArguments => _routeArguments;
+
   int _currentTab = 0;
   int get currentTab => _currentTab;
 
   String _previousRoute = 'home';
   String get previousRoute => _previousRoute;
 
-  void navigateTo(String route) {
+  void navigateTo(String route, {Map<String, dynamic>? arguments}) {
     if (route == 'profile') {
       setTab(4);
     } else if (route == 'room_gateway') {
@@ -44,6 +47,7 @@ class ShareState extends ChangeNotifier {
         _previousRoute = _currentRoute;
       }
       _currentRoute = route;
+      _routeArguments = arguments;
       notifyListeners();
     }
   }
@@ -192,6 +196,34 @@ class ShareState extends ChangeNotifier {
     _transferPhase = 0;
     _transferProgress = 0.0;
     _isTransferPaused = false;
+    _transferFiles.clear();
+    notifyListeners();
+  }
+
+  // Individual File Transfer State
+  List<TransferFile> _transferFiles = [];
+  List<TransferFile> get transferFiles => _transferFiles;
+
+  void setTransferFiles(List<TransferFile> files) {
+    _transferFiles = files;
+    notifyListeners();
+  }
+
+  void updateFileTransfer(String name, int totalBytes, int transferredBytes, String status) {
+    final idx = _transferFiles.indexWhere((f) => f.name == name);
+    if (idx != -1) {
+      _transferFiles[idx].transferredBytes = transferredBytes;
+      if (totalBytes > 0) _transferFiles[idx].sizeBytes = totalBytes;
+      _transferFiles[idx].status = status;
+    } else {
+      _transferFiles.add(TransferFile(
+        id: name,
+        name: name,
+        sizeBytes: totalBytes,
+        transferredBytes: transferredBytes,
+        status: status,
+      ));
+    }
     notifyListeners();
   }
 
@@ -294,4 +326,20 @@ class ShareState extends ChangeNotifier {
     _roomMembers.clear();
     notifyListeners();
   }
+}
+
+class TransferFile {
+  final String id;
+  final String name;
+  int sizeBytes;
+  int transferredBytes;
+  String status;
+
+  TransferFile({
+    required this.id,
+    required this.name,
+    required this.sizeBytes,
+    this.transferredBytes = 0,
+    this.status = 'pending',
+  });
 }

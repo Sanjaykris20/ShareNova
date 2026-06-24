@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 // Import your app screens
 import 'home_screen.dart';
@@ -26,16 +27,28 @@ import 'replicate_screen.dart';
 import 'web_share_screen.dart';
 import 'invite_screen.dart';
 
+// Auth Screens
+import 'screens/auth/login_screen.dart';
+import 'screens/auth/signup_screen.dart';
+import 'screens/auth/setup_profile_screen.dart';
+import 'screens/auth/phone_login_screen.dart';
+import 'screens/auth/otp_screen.dart';
+
 // Import shared state
 import 'share_state.dart';
 import 'services/p2p_service.dart';
+import 'services/auth_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ShareState()),
         Provider(create: (_) => P2pService()),
+        Provider(create: (_) => AuthService()),
       ],
       child: const ShareNovaApp(),
     ),
@@ -68,6 +81,20 @@ class RootNavigator extends StatelessWidget {
     switch (state.currentRoute) {
       case 'splash':
         return SplashScreen();
+      case 'login':
+        return LoginScreen();
+      case 'signup':
+        return SignupScreen();
+      case 'setup_profile':
+        return SetupProfileScreen();
+      case 'phone_login':
+        return PhoneLoginScreen();
+      case 'otp':
+        final args = state.routeArguments;
+        return OtpScreen(
+          verificationId: args?['verificationId'] ?? '',
+          phone: args?['phone'] ?? '',
+        );
       case 'home':
         return MainShell();
       case 'file_manager':

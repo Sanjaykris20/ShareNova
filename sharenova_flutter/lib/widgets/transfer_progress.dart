@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../share_state.dart';
-import '../helpers/file_helper.dart';
 
 class TransferProgressWidget extends StatelessWidget {
   const TransferProgressWidget({super.key});
@@ -16,21 +15,31 @@ class TransferProgressWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = Provider.of<ShareState>(context);
-    final files = state.pickedFiles;
+    final files = state.transferFiles;
     
     if (files.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final totalSize = FileHelper.totalSize(files);
-    final isComplete = state.transferPhase == 4;
+    int totalSize = 0;
+    for (var f in files) {
+      totalSize += f.sizeBytes;
+    }
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1F2937),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          )
+        ]
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -39,12 +48,12 @@ class TransferProgressWidget extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                "Transfer Details",
-                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16),
+                "Detailed File List",
+                style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1F2937), fontSize: 16),
               ),
               Text(
                 _formatBytes(totalSize),
-                style: const TextStyle(color: Colors.grey, fontSize: 14),
+                style: const TextStyle(color: Color(0xFF6B7280), fontSize: 14),
               ),
             ],
           ),
@@ -55,44 +64,61 @@ class TransferProgressWidget extends StatelessWidget {
             itemCount: files.length,
             itemBuilder: (context, index) {
               final file = files[index];
-              final basename = file.uri.pathSegments.last;
-              final sizeStr = _formatBytes(file.lengthSync());
-              
-              // We'll roughly estimate individual progress.
-              // In a real app, P2pService could publish a Map<String, double> per file.
-              // For now, we show a filled bar if complete, or a general indicator.
-              final progress = isComplete ? 1.0 : (state.transferProgress / 100.0);
+              final progress = file.sizeBytes > 0 
+                  ? (file.transferredBytes / file.sizeBytes).clamp(0.0, 1.0) 
+                  : 0.0;
+                  
+              final isComplete = file.status == 'completed';
+              final isFailed = file.status == 'failed';
+              final isPaused = file.status == 'paused' || state.isTransferPaused;
+
+              Color progressColor = const Color(0xFF3B82F6); // Blue
+              if (isComplete) progressColor = const Color(0xFF10B981); // Green
+              if (isFailed) progressColor = const Color(0xFFEF4444); // Red
+              if (isPaused) progressColor = const Color(0xFFFBBF24); // Yellow
 
               return Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
+                padding: const EdgeInsets.only(bottom: 12.0),
                 child: Row(
                   children: [
-                    Icon(Icons.insert_drive_file, color: Colors.blue[300], size: 20),
-                    const SizedBox(width: 8),
+                    Icon(
+                      isComplete ? Icons.check_circle : Icons.insert_drive_file,
+                      color: isComplete ? const Color(0xFF10B981) : const Color(0xFF93C5FD), 
+                      size: 24
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            basename,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  file.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: Color(0xFF1F2937), fontSize: 14, fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _formatBytes(file.sizeBytes),
+                                style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 6),
                           LinearProgressIndicator(
                             value: progress,
-                            backgroundColor: const Color(0xFF111827),
-                            color: isComplete ? Colors.green : Colors.blue,
-                            minHeight: 4,
+                            backgroundColor: const Color(0xFFF3F4F6),
+                            color: progressColor,
+                            minHeight: 6,
+                            borderRadius: BorderRadius.circular(3),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      sizeStr,
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                   ],
                 ),

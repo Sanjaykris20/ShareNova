@@ -1,6 +1,3 @@
-// ignore_for_file: unused_import
-// ignore_for_file: avoid_print
-// ignore_for_file: use_build_context_synchronously
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -21,8 +18,10 @@ class TransferScreen extends StatefulWidget {
   State<TransferScreen> createState() => _TransferScreenState();
 }
 
-class _TransferScreenState extends State<TransferScreen> {
+class _TransferScreenState extends State<TransferScreen> with SingleTickerProviderStateMixin {
   bool _showToast = false;
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
 
   final List<String> _phaseMessages = [
     "Generating local keypair...",
@@ -35,6 +34,15 @@ class _TransferScreenState extends State<TransferScreen> {
   @override
   void initState() {
     super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+    
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
     final state = Provider.of<ShareState>(context, listen: false);
     final p2p = Provider.of<P2pService>(context, listen: false);
     
@@ -51,6 +59,11 @@ class _TransferScreenState extends State<TransferScreen> {
         if (mounted) {
           state.setTransferProgress(100.0);
           state.setTransferPhase(4);
+        }
+      };
+      p2p.onFileProgress = (name, total, transferred, status) {
+        if (mounted) {
+          state.updateFileTransfer(name, total, transferred, status);
         }
       };
       p2p.onError = (err) {
@@ -86,6 +99,7 @@ class _TransferScreenState extends State<TransferScreen> {
 
   @override
   void dispose() {
+    _pulseController.dispose();
     super.dispose();
   }
 
@@ -106,17 +120,17 @@ class _TransferScreenState extends State<TransferScreen> {
     final choice = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1F2937),
-        title: const Text('Select Content', style: TextStyle(color: Colors.white)),
-        content: const Text('Do you want to send individual files or an entire folder?', style: TextStyle(color: Colors.white70)),
+        backgroundColor: Colors.white,
+        title: const Text('Select Content', style: TextStyle(color: Color(0xFF1F2937))),
+        content: const Text('Do you want to send individual files or an entire folder?', style: TextStyle(color: Color(0xFF6B7280))),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, 'files'),
-            child: const Text('Pick Files', style: TextStyle(color: Colors.blue)),
+            child: const Text('Pick Files', style: TextStyle(color: Color(0xFF2563EB))),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, 'folder'),
-            child: const Text('Pick Folder', style: TextStyle(color: Colors.blue)),
+            child: const Text('Pick Folder', style: TextStyle(color: Color(0xFF2563EB))),
           ),
         ],
       ),
@@ -179,9 +193,10 @@ class _TransferScreenState extends State<TransferScreen> {
   @override
   Widget build(BuildContext context) {
     final state = Provider.of<ShareState>(context);
+    final bool isComplete = state.transferPhase == 4;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF030712),
+      backgroundColor: const Color(0xFFF9FAFB),
       body: SafeArea(
         child: Stack(
           children: [
@@ -196,20 +211,20 @@ class _TransferScreenState extends State<TransferScreen> {
                       Text(
                         state.transferPhase < 3
                             ? "Securing Channel"
-                            : state.transferPhase == 4
+                            : isComplete
                                 ? "Complete"
                                 : state.isTransferPaused
                                     ? "Paused"
                                     : "Transferring",
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
                       ),
                       if (state.transferPhase == 3)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
                             color: state.isTransferPaused
-                                ? const Color(0xFF78350F)
-                                : const Color(0xFF1E3A8A),
+                                ? const Color(0xFFFEF3C7)
+                                : const Color(0xFFDBEAFE),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
@@ -217,7 +232,7 @@ class _TransferScreenState extends State<TransferScreen> {
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: state.isTransferPaused ? const Color(0xFFFBBF24) : const Color(0xFF93C5FD),
+                              color: state.isTransferPaused ? const Color(0xFFD97706) : const Color(0xFF2563EB),
                             ),
                           ),
                         ),
@@ -226,7 +241,7 @@ class _TransferScreenState extends State<TransferScreen> {
                 ),
 
                 Expanded(
-                  child: Padding(
+                  child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24.0),
                     child: Column(
                       children: [
@@ -234,9 +249,16 @@ class _TransferScreenState extends State<TransferScreen> {
                         Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF111827),
+                            color: Colors.white,
                             borderRadius: BorderRadius.circular(32),
-                            border: Border.all(color: const Color(0xFF1F2937)),
+                            border: Border.all(color: const Color(0xFFE5E7EB)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              )
+                            ]
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -245,13 +267,13 @@ class _TransferScreenState extends State<TransferScreen> {
                                 children: [
                                   const CircleAvatar(
                                     radius: 32,
-                                    backgroundColor: Color(0xFF1F2937),
+                                    backgroundColor: Color(0xFFF3F4F6),
                                     backgroundImage: NetworkImage(
                                       "https://api.dicebear.com/7.x/avataaars/png?seed=Felix",
                                     ),
                                   ),
                                   const SizedBox(height: 8),
-                                  const Text("Me", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                                  const Text("Me", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1F2937))),
                                 ],
                               ),
                               Expanded(
@@ -262,13 +284,13 @@ class _TransferScreenState extends State<TransferScreen> {
                                       if (state.transferPhase < 3) ...[
                                         Icon(
                                           state.transferPhase == 2 ? LucideIcons.key : LucideIcons.shield_alert,
-                                          color: state.transferPhase == 2 ? Colors.green : Colors.blue,
+                                          color: state.transferPhase == 2 ? const Color(0xFF10B981) : const Color(0xFF2563EB),
                                         ),
                                         const SizedBox(height: 8),
                                         Text(
                                           _phaseMessages[state.transferPhase],
                                           textAlign: TextAlign.center,
-                                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey),
+                                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF6B7280)),
                                         ),
                                       ] else ...[
                                         Container(
@@ -289,14 +311,24 @@ class _TransferScreenState extends State<TransferScreen> {
                                           ),
                                         ),
                                         const SizedBox(height: 12),
-                                        ClipRRect(
-                                          borderRadius: BorderRadius.circular(10),
-                                          child: LinearProgressIndicator(
-                                            value: state.transferProgress / 100,
-                                            backgroundColor: const Color(0xFF1F2937),
-                                            color: state.isTransferPaused ? Colors.yellow : const Color(0xFF3B82F6),
-                                            minHeight: 8,
-                                          ),
+                                        AnimatedBuilder(
+                                          animation: _pulseAnimation,
+                                          builder: (context, child) {
+                                            return Transform.scale(
+                                              scale: isComplete || state.isTransferPaused ? 1.0 : _pulseAnimation.value,
+                                              child: ClipRRect(
+                                                borderRadius: BorderRadius.circular(10),
+                                                child: LinearProgressIndicator(
+                                                  value: state.transferProgress / 100,
+                                                  backgroundColor: const Color(0xFFF3F4F6),
+                                                  color: isComplete 
+                                                    ? const Color(0xFF10B981)
+                                                    : state.isTransferPaused ? const Color(0xFFFBBF24) : const Color(0xFF3B82F6),
+                                                  minHeight: 8,
+                                                ),
+                                              ),
+                                            );
+                                          }
                                         ),
                                       ]
                                     ],
@@ -307,26 +339,21 @@ class _TransferScreenState extends State<TransferScreen> {
                                 children: [
                                   const CircleAvatar(
                                     radius: 32,
-                                    backgroundColor: Color(0xFF1F2937),
+                                    backgroundColor: Color(0xFFF3F4F6),
                                     backgroundImage: NetworkImage(
                                       "https://api.dicebear.com/7.x/avataaars/png?seed=Mac",
                                     ),
                                   ),
                                   const SizedBox(height: 8),
-                                  const Text("Sarah", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                                  const Text("Sarah", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1F2937))),
                                 ],
                               ),
                             ],
                           ),
                         ),
 
-                        // Transfer Progress Widget
-                        if (state.pickedFiles.isNotEmpty)
-                          const Flexible(
-                            child: SingleChildScrollView(
-                              child: TransferProgressWidget(),
-                            ),
-                          ),
+                        // Transfer Progress Widget (Detailed file list)
+                        const TransferProgressWidget(),
 
                         const SizedBox(height: 24),
 
@@ -338,18 +365,18 @@ class _TransferScreenState extends State<TransferScreen> {
                             children: [
                               const Text(
                                 "Total Progress",
-                                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
                               ),
                               Text(
                                 "${state.transferProgress.toInt()}%",
                                 style: TextStyle(
                                   fontSize: 40,
                                   fontWeight: FontWeight.bold,
-                                  color: state.transferPhase == 4
-                                      ? Colors.green
+                                  color: isComplete
+                                      ? const Color(0xFF10B981)
                                       : state.isTransferPaused
-                                          ? Colors.yellow
-                                          : Colors.blue,
+                                          ? const Color(0xFFFBBF24)
+                                          : const Color(0xFF3B82F6),
                                 ),
                               ),
                             ],
@@ -360,8 +387,8 @@ class _TransferScreenState extends State<TransferScreen> {
                             child: LinearProgressIndicator(
                               value: state.transferProgress / 100,
                               minHeight: 16,
-                              backgroundColor: const Color(0xFF111827),
-                              color: state.transferPhase == 4 ? Colors.green : Colors.blue,
+                              backgroundColor: const Color(0xFFE5E7EB),
+                              color: isComplete ? const Color(0xFF10B981) : const Color(0xFF3B82F6),
                             ),
                           ),
                         ],
@@ -373,19 +400,28 @@ class _TransferScreenState extends State<TransferScreen> {
                 // Footer Actions
                 Container(
                   padding: const EdgeInsets.all(24),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF030712),
-                    border: Border(top: BorderSide(color: Color(0xFF111827))),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border(top: BorderSide(color: const Color(0xFFE5E7EB))),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, -4),
+                      )
+                    ]
                   ),
-                  child: state.transferPhase == 4
+                  child: isComplete
                       ? Row(
                           children: [
                             Expanded(
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF2563EB),
+                                  foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(vertical: 16),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                  elevation: 0,
                                 ),
                                 onPressed: () {
                                   state.clearSelection();
@@ -398,9 +434,11 @@ class _TransferScreenState extends State<TransferScreen> {
                             Expanded(
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF1F2937),
+                                  backgroundColor: const Color(0xFFF3F4F6),
+                                  foregroundColor: const Color(0xFF1F2937),
                                   padding: const EdgeInsets.symmetric(vertical: 16),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                  elevation: 0,
                                 ),
                                 onPressed: () {
                                   state.navigateTo('history');
@@ -416,9 +454,11 @@ class _TransferScreenState extends State<TransferScreen> {
                               Expanded(
                                 child: ElevatedButton(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: state.isTransferPaused ? const Color(0xFF2563EB) : const Color(0xFFD97706),
+                                    backgroundColor: state.isTransferPaused ? const Color(0xFF2563EB) : const Color(0xFFF59E0B),
+                                    foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(vertical: 16),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                    elevation: 0,
                                   ),
                                   onPressed: () => state.toggleTransferPause(),
                                   child: Text(
@@ -432,9 +472,11 @@ class _TransferScreenState extends State<TransferScreen> {
                             Expanded(
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
+                                  backgroundColor: const Color(0xFFEF4444),
+                                  foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(vertical: 16),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                  elevation: 0,
                                 ),
                                 onPressed: _handleDisconnect,
                                 child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
@@ -446,8 +488,10 @@ class _TransferScreenState extends State<TransferScreen> {
                                 child: ElevatedButton(
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF2563EB),
+                                    foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(vertical: 16),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                    elevation: 0,
                                   ),
                                     onPressed: _pickGeneric,
                                     child: const Text("Pick Files", style: TextStyle(fontWeight: FontWeight.bold)),
@@ -459,9 +503,11 @@ class _TransferScreenState extends State<TransferScreen> {
                                 Expanded(
                                   child: ElevatedButton(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green,
+                                      backgroundColor: const Color(0xFF10B981),
+                                      foregroundColor: Colors.white,
                                       padding: const EdgeInsets.symmetric(vertical: 16),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                      elevation: 0,
                                     ),
                                     onPressed: _sendPickedFiles,
                                     child: const Text("Send", style: TextStyle(fontWeight: FontWeight.bold)),
@@ -480,7 +526,7 @@ class _TransferScreenState extends State<TransferScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   decoration: BoxDecoration(
-                    color: Colors.red,
+                    color: const Color(0xFFEF4444),
                     borderRadius: BorderRadius.circular(30),
                   ),
                   child: Row(

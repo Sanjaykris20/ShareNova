@@ -56,12 +56,23 @@ class _ReceiveScreenState extends State<ReceiveScreen> with SingleTickerProvider
         }
       }
 
+      // Start broadcasting our presence to Sender radars
+      await _p2pService.startAdvertising('', _port);
+
       // Listen to progress and completion
       _p2pService.onProgress = (progress) {
-        setState(() {
-          _isTransferring = true;
-          _progress = progress;
-        });
+        if (mounted) {
+          setState(() {
+            _isTransferring = true;
+            _progress = progress;
+          });
+        }
+      };
+
+      _p2pService.onFileProgress = (name, total, transferred, status) {
+        if (mounted) {
+          Provider.of<ShareState>(context, listen: false).updateFileTransfer(name, total, transferred, status);
+        }
       };
 
       _p2pService.onTransferComplete = (filePath) {
@@ -94,7 +105,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> with SingleTickerProvider
   @override
   void dispose() {
     _radarController.dispose();
-    _p2pService.dispose();
+    _p2pService.stopAdvertising();
     super.dispose();
   }
 

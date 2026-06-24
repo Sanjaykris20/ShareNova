@@ -5,9 +5,43 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'share_state.dart';
+import 'services/auth_service.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  UserProfile? _profile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final user = authService.currentUser;
+    if (user != null) {
+      final p = await authService.getUserProfile(user.uid);
+      if (mounted) {
+        setState(() {
+          _profile = p;
+        });
+      }
+    }
+  }
+
+  Future<void> _signOut() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final state = Provider.of<ShareState>(context, listen: false);
+    await authService.signOut();
+    state.navigateTo('splash');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,9 +68,9 @@ class ProfileScreen extends StatelessWidget {
                   BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 5)
                 ],
               ),
-              child: const Icon(LucideIcons.settings, size: 20, color: Color(0xFF4B5563)),
+              child: const Icon(LucideIcons.log_out, size: 20, color: Color(0xFF4B5563)),
             ),
-            onPressed: () {},
+            onPressed: _signOut,
           ),
           const SizedBox(width: 8),
         ],
@@ -67,7 +101,7 @@ class ProfileScreen extends StatelessWidget {
                     padding: const EdgeInsets.all(2),
                     child: CircleAvatar(
                       backgroundColor: Colors.white,
-                      backgroundImage: const NetworkImage("https://api.dicebear.com/7.x/avataaars/png?seed=Felix"),
+                      backgroundImage: NetworkImage(_profile?.avatarUrl ?? "https://api.dicebear.com/7.x/avataaars/png?seed=Felix"),
                       child: Align(
                         alignment: Alignment.bottomRight,
                         child: Container(
@@ -86,16 +120,16 @@ class ProfileScreen extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        "Alex Walker",
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF111827)),
+                      Text(
+                        _profile?.name ?? "Loading...",
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF111827)),
                       ),
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Text(
-                            "ID: SH-9482X",
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF6B7280)),
+                          Text(
+                            "@\${_profile?.username ?? 'loading'}",
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF6B7280)),
                           ),
                           const SizedBox(width: 8),
                           Container(

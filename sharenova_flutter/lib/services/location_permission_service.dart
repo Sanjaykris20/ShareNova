@@ -11,8 +11,15 @@ class LocationPermissionService {
     if (kIsWeb) return true;
 
     final status = await Permission.locationWhenInUse.status;
-    if (status.isGranted) return true;
-    final result = await Permission.locationWhenInUse.request();
-    return result.isGranted;
+    if (!status.isGranted) {
+      await Permission.locationWhenInUse.request();
+    }
+
+    final wifiStatus = await Permission.nearbyWifiDevices.status;
+    if (!wifiStatus.isGranted) {
+      await Permission.nearbyWifiDevices.request();
+    }
+
+    return await Permission.locationWhenInUse.isGranted || await Permission.nearbyWifiDevices.isGranted;
   }
 }

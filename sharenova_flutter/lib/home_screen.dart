@@ -6,9 +6,36 @@ import 'package:provider/provider.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'share_state.dart';
 import 'mock_data.dart';
+import 'services/auth_service.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  UserProfile? _profile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final user = authService.currentUser;
+    if (user != null) {
+      final p = await authService.getUserProfile(user.uid);
+      if (mounted) {
+        setState(() {
+          _profile = p;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,8 +63,8 @@ class HomeScreen extends StatelessWidget {
                       child: CircleAvatar(
                         radius: 20,
                         backgroundColor: Colors.white,
-                        backgroundImage: const NetworkImage(
-                          "https://api.dicebear.com/7.x/avataaars/png?seed=Felix",
+                        backgroundImage: NetworkImage(
+                          _profile?.avatarUrl ?? "https://api.dicebear.com/7.x/avataaars/png?seed=Felix",
                         ),
                         child: Align(
                           alignment: Alignment.bottomRight,
@@ -330,7 +357,7 @@ class HomeScreen extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      "${file.size} • ${file.time}",
+                                      "\${file.size} • \${file.time}",
                                       style: const TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.bold,
